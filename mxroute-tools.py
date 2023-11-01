@@ -37,6 +37,7 @@ ENDPOINT_PREFIX = "https://"
 ENDPOINT_SUFFIX = ".mxrouting.net:2222"
 DOMAINS_CMD = "CMD_API_SHOW_DOMAINS"
 POP_CMD = "CMD_API_POP"
+FORWARDERS_CMD = "CMD_API_EMAIL_FORWARDERS"
 HEADERS = {"Content-Type": "application/json"}
 
 # Globals
@@ -147,10 +148,21 @@ def main():
     # Get the list of mailboxes
     email_boxes = get_email_data_per_domain(POP_CMD, domains)
     box_count = sum(len(box) for box in email_boxes.values())
-    print(f"* Email Accounts ({box_count})")
+    print(f"# Email Accounts ({box_count})")
     for domain, boxes in email_boxes.items():
         for box in boxes:
             print(f"{box}@{domain}")
+    print()
+
+    # Get the list of forwarders
+    forwarders = get_email_data_per_domain(FORWARDERS_CMD, domains)
+    forwarder_count = sum(len(fwd) for fwd in forwarders.values())
+    print(f"# Forwarders ({forwarder_count})")
+    for domain, fwds in forwarders.items():
+        for fwd_from, fwd_to in fwds.items():
+            to = ",".join(fwd_to)
+            print(f"{fwd_from}@{domain} --> {to}")
+    print()
 
 if __name__ == '__main__':
     main()
