@@ -146,7 +146,8 @@ def main():
 
     # Get the list of mailboxes
     email_boxes = get_email_data_per_domain(POP_CMD, domains)
-    print(f"* Email Accounts ({len(email_boxes)})")
+    box_count = sum(len(box) for box in email_boxes.values())
+    print(f"* Email Accounts ({box_count})")
     for domain, boxes in email_boxes.items():
         for box in boxes:
             print(f"{box}@{domain}")
