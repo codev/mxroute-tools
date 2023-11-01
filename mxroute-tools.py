@@ -37,6 +37,8 @@ ENDPOINT_SUFFIX = ".mxrouting.net:2222"
 DOMAINS_CMD = "CMD_API_SHOW_DOMAINS"
 POP_CMD = "CMD_API_POP"
 FORWARDERS_CMD = "CMD_API_EMAIL_FORWARDERS"
+DNS_CMD = "CMD_API_DNS_CONTROL"
+DKIM_SUB = 'x._domainkey'
 HEADERS = {"Content-Type": "application/json"}
 
 # Globals
@@ -53,7 +55,12 @@ def get_config():
     global config
     parser = argparse.ArgumentParser(
         prog="mxroute-tools",
+        formatter_class=argparse.RawTextHelpFormatter,
         description='Tools for MXRoute.com email dashboard via DirectAdmin API.')
+    parser.add_argument('command', choices=['list', 'dkim'], default='list', type=str, nargs='?',
+                        help="""command to run:
+list - list information about domains and email accounts
+dkim - check DKIM settings on each domain""")
     parser.add_argument('-s', '--host',
                         required=True,
                         help="Short server address, eg. for maildemo.mxrouting.net use maildemo")
@@ -103,13 +110,9 @@ def get_email_data_per_domain(cmd, domains, action='list'):
         result[domain] = response
     return result
 
-
-def main():
-    """Main entry point"""
-    get_config()
-
+def command_list(domains):
+    """List information about domains"""
     # Get the list of domains
-    domains = make_api_request(DOMAINS_CMD, {})
     print(f"# Domains ({len(domains)})")
     for domain in domains:
         print(domain)
@@ -133,6 +136,53 @@ def main():
             to = ",".join(fwd_to)
             print(f"{fwd_from}@{domain} --> {to}")
     print()
+
+def command_dkim(domains):
+    """Check DKIM settings for domains"""
+    print("* DKIM settings")
+
+    for domain in domains:
+        # Get the DKIM data for each domain
+        dns_data = make_api_request(DNS_CMD, {'domain': domain })
+        dkim_data = next((item for item in dns_data['records'] if item.get('name') == DKIM_SUB), None)
+        if dkim_data:
+            dkim_data = dkim_data['value']
+            dkim_data = dkim_data[1:len(dkim_data)-1]
+
+        # Now test if it matches by looking up the live value on DNS
+        # pip3 install dnspython
+        import dns.resolver
+        dkim_in_dns = ''
+        try:
+            dns_lookup = dns.resolver.resolve(f"{DKIM_SUB}.{domain}", 'TXT')[0]
+            for txt_string in dns_lookup.strings:
+                dkim_in_dns = dkim_in_dns + txt_string.decode('utf-8')
+        except:
+            dkim_in_dns = 'NONE'
+
+        if dkim_in_dns == dkim_data:
+            print(f"** DNS CORRECT for {domain}")
+        else:
+            if dkim_in_dns and dkim_in_dns != 'NONE':
+                print (f"** DNS SETUP for {domain}")
+            else:
+                print(f"** DNS FAILURE for {domain}")
+            dkim_split = ['"' + dkim_data[i:i+110] + '"' for i in range(0, len(dkim_data), 250)]
+            print(f"{DKIM_SUB} 3000 IN TXT " + " ".join(dkim_split))
+            print("")
+
+
+def main():
+    """Main entry point"""
+    get_config()
+
+    domains = make_api_request(DOMAINS_CMD, {})
+    if config['command'] == 'list':
+        command_list(domains)
+    elif config['command'] == 'dkim':
+        command_dkim(domains)
+    else:
+        print(f"ERROR unknown command: {config['command']}")
 
 if __name__ == '__main__':
     main()

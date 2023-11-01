@@ -11,6 +11,7 @@ A python script for interacting with the Direct Admin API on [MXRoute.com](https
 * List domains managed by account
 * List mailboxes
 * List forwarders
+* Check DKIM settings on domains
 
 ## Requirements
 
