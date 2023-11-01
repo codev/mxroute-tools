@@ -26,17 +26,21 @@ __license__ = "GPL"
 __maintainer__ = "Marc Sutton"
 __email__ = "marc@codev.uk"
 
-import requests
+import sys
 import json
 import getopt
-import sys
 import getpass
+import requests
 
 # Constants for the API
 ENDPOINT_PREFIX = "https://"
 ENDPOINT_SUFFIX = ".mxrouting.net:2222"
 DOMAINS_CMD = "CMD_API_SHOW_DOMAINS"
+POP_CMD = "CMD_API_POP"
 HEADERS = {"Content-Type": "application/json"}
+
+# Globals
+config = {}
 
 def show_usage():
     """Prints usage and exits"""
@@ -49,7 +53,16 @@ def show_usage():
 
 
 def get_config():
-    """Process command line options, returns a dictionary with config in it, will exit on error"""
+    """
+    Process command line options.
+
+    Returns a dictionary with config in it as well as placing it into a global called config.
+    Exits on error after displaying messages.
+    """
+
+    global config
+    config = {}
+    errors = []
 
     try:
         short_arguments = "h:u:p:"
@@ -58,11 +71,8 @@ def get_config():
     except getopt.GetoptError:
         show_usage()
 
-    config = {}
-    errors = []
-
     # Process the command line, storing values in config and any errors
-    if not len(options) and not len(remaining_args):
+    if not options and not remaining_args:
         show_usage()
 
     for option, value in options:
@@ -81,7 +91,7 @@ def get_config():
     # Check the options, showing errors and exiting if needed
     for error in errors:
         print ("ERROR: ", error)
-    if len(errors):
+    if errors:
         sys.exit(1)
 
     # Prompt for any missing arguments
@@ -90,14 +100,18 @@ def get_config():
 
     return config
 
+def make_api_request(cmd, params):
+    """
+    Make a call to the Direct Admin API taking the command and parameters.
 
-def make_api_request(cmd, config, params={}):
-    """Make a call to the Direct Admin API, returns the json response"""
+    Returns the response.
+    """
     url = f"{ENDPOINT_PREFIX}{config['host']}{ENDPOINT_SUFFIX}/{cmd}"
     default_params = {'json': 'yes'}
     request_params = {**default_params, **(params or {})}
     try:
-        response = requests.get(url, auth=(config['user'], config['pass']), headers=HEADERS, params=request_params)
+        response = requests.get(url, auth=(config['user'], config['pass']),
+                                headers=HEADERS, params=request_params, timeout=10)
         response.raise_for_status()  # Will raise an error for bad status codes
         return response.json()
     except json.decoder.JSONDecodeError as e:
@@ -110,17 +124,32 @@ def make_api_request(cmd, config, params={}):
         print(f"ERROR: RequestException: {e}")
         raise
 
+def get_email_data_per_domain(cmd, domains, action='list'):
+    """Make a request per domains, returns a dictionary mapping domains to results"""
+    result = {}
+    for domain in domains:
+        response = make_api_request(cmd, {'domain': domain, 'action': action})
+        result[domain] = response
+    return result
 
 
 def main():
     """Main entry point"""
-    config = get_config()
+    get_config()
 
     # Get the list of domains
-    domains = make_api_request(DOMAINS_CMD, config)
+    domains = make_api_request(DOMAINS_CMD, {})
     print(f"# Domains ({len(domains)})")
     for domain in domains:
         print(domain)
+    print()
+
+    # Get the list of mailboxes
+    email_boxes = get_email_data_per_domain(POP_CMD, domains)
+    print(f"* Email Accounts ({len(email_boxes)})")
+    for domain, boxes in email_boxes.items():
+        for box in boxes:
+            print(f"{box}@{domain}")
 
 if __name__ == '__main__':
     main()
