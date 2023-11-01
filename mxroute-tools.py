@@ -26,10 +26,9 @@ __license__ = "GPL"
 __maintainer__ = "Marc Sutton"
 __email__ = "marc@codev.uk"
 
-import sys
 import json
-import getopt
 import getpass
+import argparse
 import requests
 
 # Constants for the API
@@ -43,16 +42,6 @@ HEADERS = {"Content-Type": "application/json"}
 # Globals
 config = {}
 
-def show_usage():
-    """Prints usage and exits"""
-
-    print ("Usage: imapbackup [OPTIONS] -h HOST -u USERNAME [-p PASSWORD]")
-    print (" -h HOST --host=HOST           Short host address, eg. if your server is maildemo.mxrouting.net use maildemo")
-    print (" -u USER --user=USER           Username to log into server")
-    print (" -p PASS --pass=PASS           Prompts for password or login key if not specified.")
-    sys.exit(1)
-
-
 def get_config():
     """
     Process command line options.
@@ -62,41 +51,22 @@ def get_config():
     """
 
     global config
-    config = {}
-    errors = []
-
-    try:
-        short_arguments = "h:u:p:"
-        long_arguments = ["server=", "user=", "pass="]
-        options, remaining_args = getopt.gnu_getopt(sys.argv[1:], short_arguments, long_arguments)
-    except getopt.GetoptError:
-        show_usage()
-
-    # Process the command line, storing values in config and any errors
-    if not options and not remaining_args:
-        show_usage()
-
-    for option, value in options:
-        if option in ("-h", "--host"):
-            config['host'] = value
-        elif option in ("-u", "--user"):
-            config['user'] = value
-        elif option in ("-p", "--pass"):
-            config['pass'] = value
-        else:
-            errors.append("Unknown option: " + option)
-
-    for arg in remaining_args:
-        errors.append("Unknown argument: " + arg)
-
-    # Check the options, showing errors and exiting if needed
-    for error in errors:
-        print ("ERROR: ", error)
-    if errors:
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        prog="mxroute-tools",
+        description='Tools for MXRoute.com email dashboard via DirectAdmin API.')
+    parser.add_argument('-s', '--host',
+                        required=True,
+                        help="Short server address, eg. for maildemo.mxrouting.net use maildemo")
+    parser.add_argument('-u', '--user',
+                        required=True,
+                        help="Username to log into server")
+    parser.add_argument('-p', '--pass',
+                        help="Login key or password, will prompt if not present",
+                        default='')
+    config = vars(parser.parse_args())
 
     # Prompt for any missing arguments
-    if 'pass' not in config:
+    if not config['pass']:
         config['pass'] = getpass.getpass("Password or Login Key: ")
 
     return config
