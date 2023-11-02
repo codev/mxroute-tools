@@ -25,6 +25,8 @@ list-of-forwarders.txt should look like this (the same format as the DirectAdmin
 first@test.com --> catch@test.com,throw@test.com
 second@test.com --> catch@test.com
 
+You can use the list command to generate a list of all current forwarders and then edit this.
+
 ## Requirements
 
 Requires python 3.8 and above.
