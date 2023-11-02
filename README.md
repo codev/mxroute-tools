@@ -18,12 +18,16 @@ A python script for interacting with the Direct Admin API on [MXRoute.com](https
 
 To update a list of forwarders, use this command line:
 
-./mxroute_tools.py -s server -u username -p neveragainfallforeveragain fwd < list-of-forwarders.txt
+```
+./mxroute_tools.py -s server -u username fwd < list-of-forwarders.txt
+```
 
 list-of-forwarders.txt should look like this (the same format as the DirectAdmin raw data):
 
+```
 first@test.com --> catch@test.com,throw@test.com
 second@test.com --> catch@test.com
+```
 
 You can use the list command to generate a list of all current forwarders and then edit this.
 
