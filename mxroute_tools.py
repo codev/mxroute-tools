@@ -19,14 +19,17 @@ MXRoute domain and email listing tool.
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = "1.0"
+__version__ = "1.1"
 __author__ = "Marc Sutton (https://codev.uk)"
 __copyright__ = "Copyright 2023 Marc Sutton"
 __license__ = "GPL"
 __maintainer__ = "Marc Sutton"
 __email__ = "marc@codev.uk"
 
+import re
+import sys
 import json
+import select
 import getpass
 import argparse
 import requests
@@ -57,10 +60,11 @@ def get_config():
         prog="mxroute-tools",
         formatter_class=argparse.RawTextHelpFormatter,
         description='Tools for MXRoute.com email dashboard via DirectAdmin API.')
-    parser.add_argument('command', choices=['list', 'dkim'], default='list', type=str, nargs='?',
+    parser.add_argument('command', choices=['list', 'dkim', 'fwd'], default='list', type=str, nargs='?',
                         help="""command to run:
 list - list information about domains and email accounts
-dkim - check DKIM settings on each domain""")
+dkim - check DKIM settings on each domain
+fwd - create or update forwarders using text entered via stdin""")
     parser.add_argument('-s', '--host',
                         required=True,
                         help="Short server address, eg. for maildemo.mxrouting.net use maildemo")
@@ -157,7 +161,7 @@ def command_dkim(domains):
             dns_lookup = dns.resolver.resolve(f"{DKIM_SUB}.{domain}", 'TXT')[0]
             for txt_string in dns_lookup.strings:
                 dkim_in_dns = dkim_in_dns + txt_string.decode('utf-8')
-        except:
+        except Exception:
             dkim_in_dns = 'NONE'
 
         if dkim_in_dns == dkim_data:
@@ -171,6 +175,46 @@ def command_dkim(domains):
             print(f"{DKIM_SUB} 3000 IN TXT " + " ".join(dkim_split))
             print("")
 
+def command_fwd(domains):
+    """Update forwarders with text from stdin"""
+
+    # Input piped in or entered interactively
+    lines = []
+    if select.select([sys.stdin], [], [], 0.0)[0]:
+        for line in sys.stdin:
+            if line.strip() == "":
+                break
+            lines.append(line.strip())
+    else:
+        print("""Enter forwarders in the DirectAdmin format from@yourdomain.com --> address@destination.com,another@test.com
+        Leave a blank line to finish and apply the changes.""")
+        while True:
+            line = input()
+            if line.strip() == "":
+                break
+            lines.append(line)
+
+    # Parsing the string into a dictionary if the pattern matches
+    fwds = []
+    pattern = r"(\w+(?:\.\w+)*)@(\w+\.\w+).+?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+(?:,[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)*)"
+    for line in lines:
+        match = re.match(pattern, line)
+        if match:
+            fwd = {
+                'domain': match.group(2),
+                'user': match.group(1),
+                'email': match.group(3)
+            }
+            if fwd['domain'] not in domains:
+                print("WARNING: Forwarders domain {fwd['domain']} was not found in a list of forwarders")
+            fwds.append(fwd)
+        else:
+            print(f"WARNING: Failed to parse - {line}")
+
+    for fwd in fwds:
+        print(f"Updating/creating forwarder for {fwd['user']}@{fwd['domain']}")
+        result = make_api_request(FORWARDERS_CMD, {'action': 'modify', **fwd})
+        print(result['result'])
 
 def main():
     """Main entry point"""
@@ -181,6 +225,8 @@ def main():
         command_list(domains)
     elif config['command'] == 'dkim':
         command_dkim(domains)
+    elif config['command'] == 'fwd':
+        command_fwd(domains)
     else:
         print(f"ERROR unknown command: {config['command']}")
 
