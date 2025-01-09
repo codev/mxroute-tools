@@ -196,7 +196,7 @@ def command_fwd(domains):
 
     # Parsing the string into a dictionary if the pattern matches
     fwds = []
-    pattern = r"(\w+(?:\.\w+)*)@(\w+\.\w+).+?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+(?:,[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)*)"
+    pattern = r"([\w-]+(?:\.[\w-]+)*)@(\w+\.\w+).+?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+(?:,[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+)*)"
     for line in lines:
         match = re.match(pattern, line)
         if match:
